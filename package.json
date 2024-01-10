@@ -16,7 +16,7 @@
     "ios/Sources",
     "ios/Tests",
     "Package.swift",
-    "CapacitorCommunityAdmob.podspec"
+    "QuquplayAdmob.podspec"
   ],
   "author": "Masahiko Sakakibara <sakakibara@rdlabo.jp>",
   "license": "MIT",
