@@ -27,7 +27,7 @@ class ConsentExecutor: NSObject {
                         "status": self.getConsentStatusString(ConsentInformation.shared.consentStatus),
                         "isConsentFormAvailable": ConsentInformation.shared.formStatus == FormStatus.available,
                         "canRequestAds": ConsentInformation.shared.canRequestAds,
-                        "privacyOptionsRequirementStatus": self.getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus)
+                        "privacyOptionsRequirementStatus": self.getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus),
                         "canShowAds": self.canShowAds(),
                         "canShowPersonalizedAds": self.canShowPersonalizedAds(),
                         "isConsentOutdated": self.isConsentOutdated()
@@ -53,59 +53,65 @@ class ConsentExecutor: NSObject {
     }
 
     func showConsentForm(_ call: CAPPluginCall) {
-        if let rootViewController = plugin?.getRootVC() {
-            let formStatus = ConsentInformation.shared.formStatus
-
-            if formStatus == FormStatus.available {
-                Task { @MainActor in
-                    do {
-                        ConsentForm.load(completionHandler: {form, loadError in
-                            if loadError != nil {
-                                call.reject(loadError?.localizedDescription ?? "Load consent form error")
-                                return
-                            }
-
-                            if ConsentInformation.shared.consentStatus == ConsentStatus.required {
-                                form?.present(from: rootViewController, completionHandler: { dismissError in
-                                    if dismissError != nil {
-                                        call.reject(dismissError?.localizedDescription ?? "Consent dismiss error")
-                                        return
-                                    }
-
-                                    call.resolve([
-                                        "status": self.getConsentStatusString(ConsentInformation.shared.consentStatus),
-                                        "canRequestAds": ConsentInformation.shared.canRequestAds,
-                                        "privacyOptionsRequirementStatus": self.getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus),
-                                        "canShowAds": self.canShowAds(),
-                                        "canShowPersonalizedAds": self.canShowPersonalizedAds()
-                                    ])
-                                })
-                            } else {
-                                call.resolve([
-                                    "status": self.getConsentStatusString(ConsentInformation.shared.consentStatus),
-                                    "canRequestAds": ConsentInformation.shared.canRequestAds,
-                                    "privacyOptionsRequirementStatus": self.getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus),
-                                    "canShowAds": self.canShowAds(),
-                                    "canShowPersonalizedAds": self.canShowPersonalizedAds()
-                                ])
-                            }
-                        })
-                    } catch {
-                        call.reject("Request consent info failed")
-                    }
-                }
-            } else {
-                call.reject("Consent Form not available")
+        guard let rootViewController = plugin?.getRootVC() else {
+            call.reject("No ViewController available", "NO_VIEW_CONTROLLER")
+            return
+        }
+        
+        let formStatus = ConsentInformation.shared.formStatus
+        guard formStatus == FormStatus.available else {
+            call.reject("Consent Form not available. Current status: \(formStatus.rawValue)", "FORM_NOT_AVAILABLE")
+            return
+        }
+        
+        ConsentForm.load { [weak self] form, loadError in
+            guard let self = self else { return }
+            
+            if let error = loadError {
+                let errorMessage = "Failed to load consent form: \(error.localizedDescription)"
+                print("AdMob Consent Error: \(errorMessage)")
+                call.reject(errorMessage, "LOAD_ERROR", error)
+                return
             }
-        } else {
-            call.reject("No ViewController")
+            
+            guard let consentForm = form else {
+                call.reject("Consent form is nil after successful load", "FORM_NIL")
+                return
+            }
+            
+            DispatchQueue.main.async {
+                consentForm.present(from: rootViewController) { [weak self] dismissError in
+                    guard let self = self else { return }
+                    
+                    if let error = dismissError {
+                        let errorMessage = "Failed to present consent form: \(error.localizedDescription)"
+                        print("AdMob Consent Error: \(errorMessage)")
+                        call.reject(errorMessage, "PRESENT_ERROR", error)
+                        return
+                    }
+                    
+                    // Form was presented and dismissed successfully
+                    let response = self.buildConsentResponse()
+                    call.resolve(response)
+                }
+            }
         }
     }
+    
+    private func buildConsentResponse() -> [String: Any] {
+        return [
+            "status": getConsentStatusString(ConsentInformation.shared.consentStatus),
+            "canRequestAds": ConsentInformation.shared.canRequestAds,
+            "privacyOptionsRequirementStatus": getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus),
+            "canShowAds": canShowAds(),
+            "canShowPersonalizedAds": canShowPersonalizedAds(),
+            "isConsentOutdated": isConsentOutdated()
+        ]
+    }
 
-    public void resetConsentInfo(final PluginCall call, BiConsumer<String, JSObject> notifyListenersFunction) {
-        ensureConsentInfo();
-        consentInformation.reset();
-        call.resolve();
+    func resetConsentInfo(_ call: CAPPluginCall) {
+        ConsentInformation.shared.reset()
+        call.resolve()
     }
 
 
