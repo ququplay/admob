@@ -57,39 +57,39 @@ class ConsentExecutor: NSObject {
             call.reject("No ViewController available", "NO_VIEW_CONTROLLER")
             return
         }
-        
+
         let formStatus = ConsentInformation.shared.formStatus
         guard formStatus == FormStatus.available else {
             call.reject("Consent Form not available. Current status: \(formStatus.rawValue)", "FORM_NOT_AVAILABLE")
             return
         }
-        
+
         ConsentForm.load { [weak self] form, loadError in
             guard let self = self else { return }
-            
+
             if let error = loadError {
                 let errorMessage = "Failed to load consent form: \(error.localizedDescription)"
                 print("AdMob Consent Error: \(errorMessage)")
                 call.reject(errorMessage, "LOAD_ERROR", error)
                 return
             }
-            
+
             guard let consentForm = form else {
                 call.reject("Consent form is nil after successful load", "FORM_NIL")
                 return
             }
-            
+
             DispatchQueue.main.async {
                 consentForm.present(from: rootViewController) { [weak self] dismissError in
                     guard let self = self else { return }
-                    
+
                     if let error = dismissError {
                         let errorMessage = "Failed to present consent form: \(error.localizedDescription)"
                         print("AdMob Consent Error: \(errorMessage)")
                         call.reject(errorMessage, "PRESENT_ERROR", error)
                         return
                     }
-                    
+
                     // Form was presented and dismissed successfully
                     let response = self.buildConsentResponse()
                     call.resolve(response)
@@ -97,7 +97,7 @@ class ConsentExecutor: NSObject {
             }
         }
     }
-    
+
     private func buildConsentResponse() -> [String: Any] {
         return [
             "status": getConsentStatusString(ConsentInformation.shared.consentStatus),
@@ -113,7 +113,6 @@ class ConsentExecutor: NSObject {
         ConsentInformation.shared.reset()
         call.resolve()
     }
-
 
     func getConsentStatusString(_ consentStatus: ConsentStatus) -> String {
         switch consentStatus {
@@ -159,15 +158,15 @@ class ConsentExecutor: NSObject {
     private func hasConsentOrLegitimateInterestFor(_ purposes: [Int], _ purposeConsent: String, _ purposeLI: String, _ hasVendorConsent: Bool, _ hasVendorLI: Bool) -> Bool {
         return purposes.allSatisfy { i in
             (hasAttribute(input: purposeLI, index: i) && hasVendorLI) ||
-            (hasAttribute(input: purposeConsent, index: i) && hasVendorConsent)
+                (hasAttribute(input: purposeConsent, index: i) && hasVendorConsent)
         }
     }
 
     private func canShowAds() -> Bool {
         let settings = UserDefaults.standard
 
-        //https://github.com/InteractiveAdvertisingBureau/GDPR-Transparency-and-Consent-Framework/blob/master/TCFv2/IAB%20Tech%20Lab%20-%20CMP%20API%20v2.md#in-app-details
-        //https://support.google.com/admob/answer/9760862?hl=en&ref_topic=9756841
+        // https://github.com/InteractiveAdvertisingBureau/GDPR-Transparency-and-Consent-Framework/blob/master/TCFv2/IAB%20Tech%20Lab%20-%20CMP%20API%20v2.md#in-app-details
+        // https://support.google.com/admob/answer/9760862?hl=en&ref_topic=9756841
 
         let purposeConsent = settings.string(forKey: "IABTCF_PurposeConsents") ?? ""
         let vendorConsent = settings.string(forKey: "IABTCF_VendorConsents") ?? ""
@@ -180,15 +179,15 @@ class ConsentExecutor: NSObject {
 
         // Minimum required for at least non-personalized ads
         return hasConsentFor([1], purposeConsent, hasGoogleVendorConsent)
-            && hasConsentOrLegitimateInterestFor([2,7,9,10], purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI)
+            && hasConsentOrLegitimateInterestFor([2, 7, 9, 10], purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI)
 
     }
 
     private func canShowPersonalizedAds() -> Bool {
         let settings = UserDefaults.standard
 
-        //https://github.com/InteractiveAdvertisingBureau/GDPR-Transparency-and-Consent-Framework/blob/master/TCFv2/IAB%20Tech%20Lab%20-%20CMP%20API%20v2.md#in-app-details
-        //https://support.google.com/admob/answer/9760862?hl=en&ref_topic=9756841
+        // https://github.com/InteractiveAdvertisingBureau/GDPR-Transparency-and-Consent-Framework/blob/master/TCFv2/IAB%20Tech%20Lab%20-%20CMP%20API%20v2.md#in-app-details
+        // https://support.google.com/admob/answer/9760862?hl=en&ref_topic=9756841
 
         // required for personalized ads
         let purposeConsent = settings.string(forKey: "IABTCF_PurposeConsents") ?? ""
@@ -200,8 +199,8 @@ class ConsentExecutor: NSObject {
         let hasGoogleVendorConsent = hasAttribute(input: vendorConsent, index: googleId)
         let hasGoogleVendorLI = hasAttribute(input: vendorLI, index: googleId)
 
-        return hasConsentFor([1,3,4], purposeConsent, hasGoogleVendorConsent)
-            && hasConsentOrLegitimateInterestFor([2,7,9,10], purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI)
+        return hasConsentFor([1, 3, 4], purposeConsent, hasGoogleVendorConsent)
+            && hasConsentOrLegitimateInterestFor([2, 7, 9, 10], purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI)
     }
 
     private func isConsentOutdated() -> Bool {
