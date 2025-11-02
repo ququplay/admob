@@ -7,78 +7,88 @@ class ConsentExecutor: NSObject {
     weak var plugin: AdMobPlugin?
 
     func requestConsentInfo(_ call: CAPPluginCall, _ debugGeography: Int, _ testDeviceIdentifiers: [String], _ tagForUnderAgeOfConsent: Bool) {
-        let parameters = UMPRequestParameters()
-        let debugSettings = UMPDebugSettings()
+        let parameters = RequestParameters()
+        let debugSettings = DebugSettings()
 
-        debugSettings.geography = UMPDebugGeography(rawValue: debugGeography) ?? UMPDebugGeography.disabled
+        debugSettings.geography = DebugGeography(rawValue: debugGeography) ?? DebugGeography.disabled
         debugSettings.testDeviceIdentifiers = testDeviceIdentifiers
 
         parameters.debugSettings = debugSettings
-        parameters.tagForUnderAgeOfConsent = tagForUnderAgeOfConsent
+        parameters.isTaggedForUnderAgeOfConsent = tagForUnderAgeOfConsent
 
         // Request an update to the consent information.
-        UMPConsentInformation.sharedInstance.requestConsentInfoUpdate(
+        ConsentInformation.shared.requestConsentInfoUpdate(
             with: parameters,
             completionHandler: { error in
                 if error != nil {
                     call.reject("Request consent info failed")
                 } else {
-                    call.resolve([
-                        "status": self.getConsentStatusString(UMPConsentInformation.sharedInstance.consentStatus),
-                        "isConsentFormAvailable": UMPConsentInformation.sharedInstance.formStatus == UMPFormStatus.available,
-                        "canShowAds": self.canShowAds(),
-                        "canShowPersonalizedAds": self.canShowPersonalizedAds(),
-                        "isConsentOutdated": self.isConsentOutdated()
-                    ])
+                    call.resolve(self.getConsentInfoDictionary())
                 }
             })
     }
 
-    func showConsentForm(_ call: CAPPluginCall) {
-        if let rootViewController = plugin?.getRootVC() {
-            let formStatus = UMPConsentInformation.sharedInstance.formStatus
+    @MainActor
+    func showPrivacyOptionsForm(_ call: CAPPluginCall) {
+        guard let rootViewController = plugin?.getRootVC() else {
+            return call.reject("No ViewController")
+        }
 
-            if formStatus == UMPFormStatus.available {
-                UMPConsentForm.load(completionHandler: {form, loadError in
-                    if loadError != nil {
-                        call.reject(loadError?.localizedDescription ?? "Load consent form error")
-                        return
-                    }
-
-                    form?.present(from: rootViewController, completionHandler: { dismissError in
-                        if dismissError != nil {
-                            call.reject(dismissError?.localizedDescription ?? "Consent dismiss error")
-                            return
-                        }
-
-                        call.resolve([
-                            "status": self.getConsentStatusString(UMPConsentInformation.sharedInstance.consentStatus),
-                            "canShowAds": self.canShowAds(),
-                            "canShowPersonalizedAds": self.canShowPersonalizedAds(),
-                            "isConsentOutdated": self.isConsentOutdated()
-                        ])
-                    })
-                })
-            } else {
-                call.reject("Consent Form not available")
+        Task {
+            do {
+                try await ConsentForm.presentPrivacyOptionsForm(from: rootViewController)
+                call.resolve()
+            } catch {
+                call.reject("Failed to show privacy options form: \(error.localizedDescription)")
             }
-        } else {
-            call.reject("No ViewController")
+        }
+    }
+
+    @MainActor
+    func showConsentForm(_ call: CAPPluginCall) {
+        guard let rootViewController = plugin?.getRootVC() else {
+            return call.reject("No ViewController")
+        }
+
+        guard ConsentInformation.shared.formStatus == FormStatus.available else {
+            return call.reject("Consent Form not available")
+        }
+
+        Task {
+            do {
+                let form = try await ConsentForm.load()
+                try await form.present(from: rootViewController)
+                call.resolve(getConsentInfoDictionary())
+            } catch {
+                call.reject("Request consent info failed")
+            }
         }
     }
 
     func resetConsentInfo(_ call: CAPPluginCall) {
-        UMPConsentInformation.sharedInstance.reset()
+        ConsentInformation.shared.reset()
         call.resolve()
     }
 
-    func getConsentStatusString(_ consentStatus: UMPConsentStatus) -> String {
+    private func getConsentInfoDictionary() -> [String: Any] {
+        return [
+            "status": getConsentStatusString(ConsentInformation.shared.consentStatus),
+            "isConsentFormAvailable": ConsentInformation.shared.formStatus == FormStatus.available,
+            "canRequestAds": ConsentInformation.shared.canRequestAds,
+            "privacyOptionsRequirementStatus": getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus),
+            "canShowAds": canShowAds(),
+            "canShowPersonalizedAds": canShowPersonalizedAds(),
+            "isConsentOutdated": isConsentOutdated()
+        ]
+    }
+
+    func getConsentStatusString(_ consentStatus: ConsentStatus) -> String {
         switch consentStatus {
-        case UMPConsentStatus.required:
+        case ConsentStatus.required:
             return "REQUIRED"
-        case UMPConsentStatus.notRequired:
+        case ConsentStatus.notRequired:
             return "NOT_REQUIRED"
-        case UMPConsentStatus.obtained:
+        case ConsentStatus.obtained:
             return "OBTAINED"
         default:
             return "UNKNOWN"
@@ -184,5 +194,15 @@ class ConsentExecutor: NSObject {
         }
 
         return false
+    }
+    func getPrivacyOptionsRequirementStatus(_ requirementStatus: PrivacyOptionsRequirementStatus) -> String {
+        switch requirementStatus {
+        case PrivacyOptionsRequirementStatus.required:
+            return "REQUIRED"
+        case PrivacyOptionsRequirementStatus.notRequired:
+            return "NOT_REQUIRED"
+        default:
+            return "UNKNOWN"
+        }
     }
 }
