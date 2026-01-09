@@ -173,7 +173,7 @@ public class AdConsentExecutor extends Executor {
                     consentInfo.put("privacyOptionsRequirementStatus", consentInformation.getPrivacyOptionsRequirementStatus().name());
                     call.resolve(consentInfo);
                 },
-                formError -> call.reject(formError.getMessage())
+                (formError) -> call.reject(formError.getMessage())
             );
         } catch (Exception ex) {
             call.reject(ex.getLocalizedMessage(), ex);
@@ -190,7 +190,7 @@ public class AdConsentExecutor extends Executor {
             }
             ensureConsentInfo();
             activity.runOnUiThread(() ->
-                UserMessagingPlatform.showPrivacyOptionsForm(activity, formError -> {
+                UserMessagingPlatform.showPrivacyOptionsForm(activity, (formError) -> {
                     if (formError != null) {
                         call.reject("Error when show privacy form", formError.getMessage());
                     } else {
@@ -214,29 +214,22 @@ public class AdConsentExecutor extends Executor {
 
             ensureConsentInfo();
             activity.runOnUiThread(() ->
-                UserMessagingPlatform.loadConsentForm(
-                    contextSupplier.get(),
-                    consentForm ->
-                        consentForm.show(activitySupplier.get(), formError -> {
-                            if (formError != null) {
-                                call.reject("Error when show consent form", formError.getMessage());
-                            } else {
-                                JSObject consentFormInfo = new JSObject();
-                                consentFormInfo.put("status", getConsentStatusString(consentInformation.getConsentStatus()));
-                                consentFormInfo.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
-                                consentFormInfo.put("canShowAds", canShowAds());
-                                consentFormInfo.put("canShowPersonalizedAds", canShowPersonalizedAds());
-                                consentFormInfo.put("isConsentOutdated", isConsentOutdated());
-                                consentFormInfo.put("canRequestAds", consentInformation.canRequestAds());
-                                consentFormInfo.put(
-                                    "privacyOptionsRequirementStatus",
-                                    consentInformation.getPrivacyOptionsRequirementStatus().name()
-                                );
-                                call.resolve(consentFormInfo);
-                            }
-                        }),
-                    formError -> call.reject("Error when show consent form", formError.getMessage())
-                )
+                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity, (formError) -> {
+                    if (formError != null) {
+                        call.reject("Error when show consent form", formError.getMessage());
+                        return;
+                    }
+
+                    JSObject consentFormInfo = new JSObject();
+                    consentFormInfo.put("status", getConsentStatusString(consentInformation.getConsentStatus()));
+                    consentFormInfo.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
+                    consentFormInfo.put("canShowAds", canShowAds());
+                    consentFormInfo.put("canShowPersonalizedAds", canShowPersonalizedAds());
+                    consentFormInfo.put("isConsentOutdated", isConsentOutdated());
+                    consentFormInfo.put("canRequestAds", consentInformation.canRequestAds());
+                    consentFormInfo.put("privacyOptionsRequirementStatus", consentInformation.getPrivacyOptionsRequirementStatus().name());
+                    call.resolve(consentFormInfo);
+                })
             );
         } catch (Exception ex) {
             call.reject(ex.getLocalizedMessage(), ex);
