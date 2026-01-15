@@ -214,7 +214,7 @@ public class AdConsentExecutor extends Executor {
 
             ensureConsentInfo();
             activity.runOnUiThread(() ->
-                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity, (formError) -> {
+                UserMessagingPlatform.loadConsentForm(activity, (formError) -> {
                     if (formError != null) {
                         call.reject("Error when show consent form", formError.getMessage());
                         return;
