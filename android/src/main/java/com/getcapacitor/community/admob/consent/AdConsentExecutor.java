@@ -213,24 +213,34 @@ public class AdConsentExecutor extends Executor {
             }
 
             ensureConsentInfo();
-            activity.runOnUiThread(() ->
-                UserMessagingPlatform.loadConsentForm(activity, (formError) -> {
-                    if (formError != null) {
-                        call.reject("Error when show consent form", formError.getMessage());
-                        return;
-                    }
+            activitySupplier
+                .get()
+                .runOnUiThread(() ->
+                    UserMessagingPlatform.loadConsentForm(
+                        contextSupplier.get(),
+                        (consentForm) ->
+                            consentForm.show(activitySupplier.get(), (formError) -> {
+                                if (formError != null) {
+                                    call.reject("Error when show consent form", formError.getMessage());
+                                } else {
+                                    JSObject consentFormInfo = new JSObject();
+                                    consentFormInfo.put("status", getConsentStatusString(consentInformation.getConsentStatus()));
+                                    consentFormInfo.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
+                                    consentFormInfo.put("canRequestAds", consentInformation.canRequestAds());
+                                    consentFormInfo.put(
+                                        "privacyOptionsRequirementStatus",
+                                        consentInformation.getPrivacyOptionsRequirementStatus().name()
+                                    );
+                                    consentFormInfo.put("canShowAds", canShowAds());
+                                    consentFormInfo.put("canShowPersonalizedAds", canShowPersonalizedAds());
+                                    consentFormInfo.put("isConsentOutdated", isConsentOutdated());
 
-                    JSObject consentFormInfo = new JSObject();
-                    consentFormInfo.put("status", getConsentStatusString(consentInformation.getConsentStatus()));
-                    consentFormInfo.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
-                    consentFormInfo.put("canShowAds", canShowAds());
-                    consentFormInfo.put("canShowPersonalizedAds", canShowPersonalizedAds());
-                    consentFormInfo.put("isConsentOutdated", isConsentOutdated());
-                    consentFormInfo.put("canRequestAds", consentInformation.canRequestAds());
-                    consentFormInfo.put("privacyOptionsRequirementStatus", consentInformation.getPrivacyOptionsRequirementStatus().name());
-                    call.resolve(consentFormInfo);
-                })
-            );
+                                    call.resolve(consentFormInfo);
+                                }
+                            }),
+                        (formError) -> call.reject("Error when show consent form", formError.getMessage())
+                    )
+                );
         } catch (Exception ex) {
             call.reject(ex.getLocalizedMessage(), ex);
         }
