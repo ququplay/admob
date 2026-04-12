@@ -13,6 +13,8 @@ import android.widget.RelativeLayout;
 import androidx.annotation.NonNull;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.util.Supplier;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.community.admob.helpers.AdViewIdHelper;
@@ -103,23 +105,22 @@ public class BannerExecutor extends Executor {
                     break;
             }
 
-            // set Safe Area only for Android 15+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                View rootView = activitySupplier.get().getWindow().getDecorView();
-                rootView.setOnApplyWindowInsetsListener((v, insets) -> {
-                    int bottomInset = insets.getSystemWindowInsetBottom();
-                    int topInset = insets.getSystemWindowInsetTop();
+            // Apply window insets for edge-to-edge support
+            // Insets will be 0 if not in edge-to-edge mode, so this handles both cases
+            View decorView = activitySupplier.get().getWindow().getDecorView();
+            ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, insets) -> {
+                int bottomInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+                int topInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
 
-                    if ("TOP_CENTER".equals(adOptions.position)) {
-                        mAdViewLayoutParams.setMargins(0, topInset, 0, 0);
-                    } else {
-                        mAdViewLayoutParams.setMargins(0, 0, 0, bottomInset);
-                    }
+                if ("TOP_CENTER".equals(adOptions.position)) {
+                    mAdViewLayoutParams.setMargins(0, topInset, 0, 0);
+                } else {
+                    mAdViewLayoutParams.setMargins(0, 0, 0, bottomInset);
+                }
 
-                    mAdViewLayout.setLayoutParams(mAdViewLayoutParams);
-                    return insets;
-                });
-            }
+                mAdViewLayout.setLayoutParams(mAdViewLayoutParams);
+                return insets;
+            });
 
             mAdViewLayout.setLayoutParams(mAdViewLayoutParams);
 

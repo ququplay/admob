@@ -28,8 +28,34 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "prepareRewardVideoAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showRewardVideoAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareRewardInterstitialAd", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "showRewardInterstitialAd", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "showRewardInterstitialAd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "loadAppOpen", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "showAppOpen", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isAppOpenLoaded", returnType: CAPPluginReturnPromise)
     ]
+    private let appOpenAdPlugin = AppOpenAdPlugin()
+    @objc func loadAppOpen(_ call: CAPPluginCall) {
+        appOpenAdPlugin.loadAppOpen(
+            call,
+            notify: { [weak self] eventName, data in
+                self?.notifyListeners(eventName, data: data)
+            }
+        )
+    }
+
+    @objc func showAppOpen(_ call: CAPPluginCall) {
+        appOpenAdPlugin.showAppOpen(
+            call,
+            getRootViewController: self.getRootVC,
+            notify: { [weak self] eventName, data in
+                self?.notifyListeners(eventName, data: data)
+            }
+        )
+    }
+
+    @objc func isAppOpenLoaded(_ call: CAPPluginCall) {
+        appOpenAdPlugin.isAppOpenLoaded(call)
+    }
 
     var testingDevices: [String] = []
 
@@ -191,11 +217,11 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
                 switch ATTrackingManager.trackingAuthorizationStatus {
                 case .authorized:
                     call.resolve(["status": AuthorizationStatusEnum.Authorized.rawValue])
-                    case .denied:
+                case .denied:
                     call.resolve(["status": AuthorizationStatusEnum.Denied.rawValue])
-                    case .restricted:
+                case .restricted:
                     call.resolve(["status": AuthorizationStatusEnum.Restricted.rawValue])
-                    case .notDetermined:
+                case .notDetermined:
                     call.resolve(["status": AuthorizationStatusEnum.NotDetermined.rawValue])
                 @unknown default:
                     call.reject("trackingAuthorizationStatus can't get status")
