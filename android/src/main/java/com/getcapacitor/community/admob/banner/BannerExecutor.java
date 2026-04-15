@@ -13,8 +13,6 @@ import android.widget.RelativeLayout;
 import androidx.annotation.NonNull;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.util.Supplier;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.community.admob.helpers.AdViewIdHelper;
@@ -35,7 +33,6 @@ public class BannerExecutor extends Executor {
     private RelativeLayout mAdViewLayout;
     private AdView mAdView;
     private ViewGroup mViewGroup;
-    private CoordinatorLayout.LayoutParams mAdViewLayoutParams;
 
     public BannerExecutor(
         Supplier<Context> contextSupplier,
@@ -88,7 +85,7 @@ public class BannerExecutor extends Executor {
             mAdViewLayout.setHorizontalGravity(Gravity.CENTER_HORIZONTAL);
             mAdViewLayout.setVerticalGravity(Gravity.BOTTOM);
 
-            mAdViewLayoutParams = new CoordinatorLayout.LayoutParams(
+            final CoordinatorLayout.LayoutParams mAdViewLayoutParams = new CoordinatorLayout.LayoutParams(
                 CoordinatorLayout.LayoutParams.WRAP_CONTENT,
                 CoordinatorLayout.LayoutParams.WRAP_CONTENT
             );
@@ -106,36 +103,44 @@ public class BannerExecutor extends Executor {
                     break;
             }
 
-            int densityMargin = (int) (adOptions.margin * density);
-
-            // Center Banner Ads
-            int adWidth = (int) (adOptions.adSize.getSize().getWidth() * density);
-
-            final int baseSideMargin;
-            if (adWidth <= 0 || adOptions.adSize.toString().equals("ADAPTIVE_BANNER")) {
-                int margin = 0;
-                if (fullscreen) {
-                    margin = (realWidthPixels - defaultWidthPixels) / 2;
-                }
-                baseSideMargin = margin;
-            } else {
-                int sideMargin = ((int) defaultWidthPixels - adWidth) / 2;
-                if (fullscreen) {
-                    sideMargin = (realWidthPixels - adWidth) / 2;
-                }
-                baseSideMargin = sideMargin;
-            }
-
-            applyBannerMargins(adOptions, baseSideMargin, densityMargin);
-
+            // set Safe Area only for Android 15+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                ViewCompat.setOnApplyWindowInsetsListener(mAdViewLayout, (v, insets) -> {
-                    applyBannerMargins(adOptions, baseSideMargin, densityMargin);
+                View rootView = activitySupplier.get().getWindow().getDecorView();
+                rootView.setOnApplyWindowInsetsListener((v, insets) -> {
+                    int bottomInset = insets.getSystemWindowInsetBottom();
+                    int topInset = insets.getSystemWindowInsetTop();
+
+                    if ("TOP_CENTER".equals(adOptions.position)) {
+                        mAdViewLayoutParams.setMargins(0, topInset, 0, 0);
+                    } else {
+                        mAdViewLayoutParams.setMargins(0, 0, 0, bottomInset);
+                    }
+
+                    mAdViewLayout.setLayoutParams(mAdViewLayoutParams);
                     return insets;
                 });
             }
 
             mAdViewLayout.setLayoutParams(mAdViewLayoutParams);
+
+            int densityMargin = (int) (adOptions.margin * density);
+
+            // Center Banner Ads
+            int adWidth = (int) (adOptions.adSize.getSize().getWidth() * density);
+
+            if (adWidth <= 0 || adOptions.adSize.toString().equals("ADAPTIVE_BANNER")) {
+                int margin = 0;
+                if (fullscreen) {
+                    margin = (realWidthPixels - defaultWidthPixels) / 2;
+                }
+                mAdViewLayoutParams.setMargins(margin, densityMargin, margin, densityMargin);
+            } else {
+                int sideMargin = ((int) defaultWidthPixels - adWidth) / 2;
+                if (fullscreen) {
+                    sideMargin = (realWidthPixels - adWidth) / 2;
+                }
+                mAdViewLayoutParams.setMargins(sideMargin, densityMargin, sideMargin, densityMargin);
+            }
 
             createNewAdView(adOptions);
 
@@ -224,27 +229,6 @@ public class BannerExecutor extends Executor {
                 final AdRequest adRequest = RequestHelper.createRequest(adOptions);
                 mAdView.loadAd(adRequest);
             });
-    }
-
-    private void applyBannerMargins(AdOptions adOptions, int sideMargin, int densityMargin) {
-        int topInset = 0;
-        int bottomInset = 0;
-
-        WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(mAdViewLayout != null ? mAdViewLayout : mViewGroup);
-        if (insets != null) {
-            topInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
-            bottomInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
-        }
-
-        if ("TOP_CENTER".equals(adOptions.position)) {
-            mAdViewLayoutParams.setMargins(sideMargin, densityMargin + topInset, sideMargin, 0);
-        } else {
-            mAdViewLayoutParams.setMargins(sideMargin, densityMargin, sideMargin, densityMargin + bottomInset);
-        }
-
-        if (mAdViewLayout != null) {
-            mAdViewLayout.setLayoutParams(mAdViewLayoutParams);
-        }
     }
 
     /**
