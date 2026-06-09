@@ -71,6 +71,10 @@ class ConsentExecutor: NSObject {
     }
 
     private func getConsentInfoDictionary() -> [String: Any] {
+        // Check (and possibly purge) outdated consent before reading the
+        // remaining values, so they reflect the post-cleanup state.
+        let isConsentOutdated = isConsentOutdated()
+
         return [
             "status": getConsentStatusString(ConsentInformation.shared.consentStatus),
             "isConsentFormAvailable": ConsentInformation.shared.formStatus == FormStatus.available,
@@ -78,7 +82,7 @@ class ConsentExecutor: NSObject {
             "privacyOptionsRequirementStatus": getPrivacyOptionsRequirementStatus(ConsentInformation.shared.privacyOptionsRequirementStatus),
             "canShowAds": canShowAds(),
             "canShowPersonalizedAds": canShowPersonalizedAds(),
-            "isConsentOutdated": isConsentOutdated()
+            "isConsentOutdated": isConsentOutdated
         ]
     }
 
@@ -160,36 +164,66 @@ class ConsentExecutor: NSObject {
             && hasConsentOrLegitimateInterestFor([2,7,9,10], purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI)
     }
 
+    /// Erases ALL core IAB TCF records simultaneously to prevent leaving
+    /// orphaned consent data that will crash Google Ad serving.
+    private func clearAllTCFPreferences(_ settings: UserDefaults) {
+        settings.removeObject(forKey: "IABTCF_TCString")
+        settings.removeObject(forKey: "IABTCF_PurposeConsents")
+        settings.removeObject(forKey: "IABTCF_VendorConsents")
+        settings.removeObject(forKey: "IABTCF_PurposeLegitimateInterests")
+        settings.removeObject(forKey: "IABTCF_VendorLegitimateInterests")
+        settings.removeObject(forKey: "IABTCF_gdprApplies") // Force SDK to reassess context
+        NSLog("AdMob: Successfully purged all IABTCF tracking variables from UserDefaults.")
+    }
+
     private func isConsentOutdated() -> Bool {
         let settings = UserDefaults.standard
         guard let tcString = settings.string(forKey: "IABTCF_TCString"), !tcString.isEmpty else {
             return false
         }
 
-        // base64 alphabet used to store data in IABTCF string
-        let base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-
-        // date is stored in digits 1..7 of the IABTCF string
-        let dateSubstring = String(tcString[tcString.index(tcString.startIndex, offsetBy: 1)..<tcString.index(tcString.startIndex, offsetBy: 7)])
-
-        // interpret date substring as base64-encoded integer value
-        var timestamp: Int64 = 0
-
-        for char in dateSubstring {
-            if let value = base64.firstIndex(of: char) {
-                timestamp = timestamp * 64 + Int64(value.utf16Offset(in: base64))
-            }
+        // 1. Safety Boundary Check: If string is way too short, it's corrupted.
+        if tcString.count < 7 {
+            clearAllTCFPreferences(settings)
+            return true
         }
 
-        // timestamp is given in deci-seconds, convert to milliseconds
+        // Base64url alphabet used in IAB TCF specifications
+        let base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+        // 2. Extract and Validate TCF Specification Version (First 6 bits / 1st character)
+        let versionChar = tcString[tcString.startIndex]
+        let tcfVersion = base64.firstIndex(of: versionChar)?.utf16Offset(in: base64) ?? -1
+
+        // TCF v2.0 through v2.3 strings all use a '2' value in the version bit field
+        if tcfVersion != 2 {
+            clearAllTCFPreferences(settings)
+            return true
+        }
+
+        // 3. Extract and Parse Timestamp (Characters at indexes 1 through 6 inclusive)
+        let dateSubstring = String(tcString[tcString.index(tcString.startIndex, offsetBy: 1)..<tcString.index(tcString.startIndex, offsetBy: 7)])
+
+        var timestamp: Int64 = 0
+        for char in dateSubstring {
+            guard let value = base64.firstIndex(of: char) else {
+                clearAllTCFPreferences(settings)
+                return true
+            }
+            timestamp = timestamp * 64 + Int64(value.utf16Offset(in: base64))
+        }
+
+        // Timestamp is given in deci-seconds, convert to milliseconds
         timestamp *= 100
 
-        // compare with current timestamp to get age in days
+        // 4. Calculate Age in Days
         let daysAgo = (Int64(Date().timeIntervalSince1970 * 1000) - timestamp) / (1000 * 60 * 60 * 24)
 
-        // delete TC string if age is over a year
-        if daysAgo > 365 {
-            settings.removeObject(forKey: "IABTCF_TCString")
+        // 5. Enforce Expiration Hard Limits
+        // Google hard-caps ad server acceptance at 395 days (13 months).
+        // The IAB TCF policy requires CMP re-checks at 365 days (12 months).
+        if daysAgo > 365 || daysAgo < 0 {
+            clearAllTCFPreferences(settings)
             return true
         }
 
