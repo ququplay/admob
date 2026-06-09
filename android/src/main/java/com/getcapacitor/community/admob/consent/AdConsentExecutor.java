@@ -61,38 +61,76 @@ public class AdConsentExecutor extends Executor {
         );
     }
 
+    /**
+     * Erases ALL core IAB TCF records simultaneously to prevent leaving
+     * orphaned consent data that will crash Google Ad serving.
+     */
+    private void clearAllTCFPreferences(SharedPreferences prefs) {
+        prefs
+            .edit()
+            .remove("IABTCF_TCString")
+            .remove("IABTCF_PurposeConsents")
+            .remove("IABTCF_VendorConsents")
+            .remove("IABTCF_PurposeLegitimateInterests")
+            .remove("IABTCF_VendorLegitimateInterests")
+            .remove("IABTCF_gdprApplies") // Force SDK to reassess context
+            .apply();
+        Log.w(logTag, "Successfully purged all IABTCF tracking variables from SharedPreferences.");
+    }
+
     public boolean isConsentOutdated() {
         Context context = contextSupplier.get();
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
+
         String tcString = prefs.getString("IABTCF_TCString", "");
 
         if (tcString == null || tcString.isEmpty()) {
             return false;
         }
 
-        // base64 alphabet used to store data in IABTCF string
+        // 1. Safety Boundary Check: If string is way too short, it's corrupted.
+        if (tcString.length() < 7) {
+            clearAllTCFPreferences(prefs);
+            return true;
+        }
+
+        // Base64url alphabet used in IAB TCF specifications
         String base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-        // date is stored in digits 1..7 of the IABTCF string
+        // 2. Extract and Validate TCF Specification Version (First 6 bits / 1st character)
+        char versionChar = tcString.charAt(0);
+        int tcfVersion = base64.indexOf(versionChar);
+
+        // TCF v2.0 through v2.3 strings all use a '2' value in the version bit field
+        if (tcfVersion != 2) {
+            clearAllTCFPreferences(prefs);
+            return true;
+        }
+
+        // 3. Extract and Parse Timestamp (Characters at indexes 1 through 6 inclusive)
         String dateSubstring = tcString.substring(1, 7);
 
-        // interpret date substring as base64-encoded integer value
         long timestamp = 0L;
-
         for (char c : dateSubstring.toCharArray()) {
             int value = base64.indexOf(c);
+            if (value == -1) {
+                clearAllTCFPreferences(prefs);
+                return true;
+            }
             timestamp = timestamp * 64 + value;
         }
 
-        // timestamp is given in deci-seconds, convert to milliseconds
+        // Timestamp is given in deci-seconds, convert to milliseconds
         timestamp *= 100;
 
-        // compare with current timestamp to get age in days
+        // 4. Calculate Age in Days
         long daysAgo = (System.currentTimeMillis() - timestamp) / (1000 * 60 * 60 * 24);
 
-        // delete TC string if age is over a year
-        if (daysAgo > 365) {
-            prefs.edit().remove("IABTCF_TCString").apply();
+        // 5. Enforce Expiration Hard Limits
+        // Google hard-caps ad server acceptance at 395 days (13 months).
+        // The IAB TCF policy requires CMP re-checks at 365 days (12 months).
+        if (daysAgo > 365 || daysAgo < 0) {
+            clearAllTCFPreferences(prefs);
             return true;
         }
 
@@ -163,12 +201,16 @@ public class AdConsentExecutor extends Executor {
                 activitySupplier.get(),
                 consentRequestParameters,
                 () -> {
+                    // Check (and possibly purge) outdated consent before reading the
+                    // remaining values, so they reflect the post-cleanup state.
+                    boolean isConsentOutdated = isConsentOutdated();
+
                     JSObject consentInfo = new JSObject();
                     consentInfo.put("status", getConsentStatusString(consentInformation.getConsentStatus()));
                     consentInfo.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
+                    consentInfo.put("isConsentOutdated", isConsentOutdated);
                     consentInfo.put("canShowAds", canShowAds());
                     consentInfo.put("canShowPersonalizedAds", canShowPersonalizedAds());
-                    consentInfo.put("isConsentOutdated", isConsentOutdated());
                     consentInfo.put("canRequestAds", consentInformation.canRequestAds());
                     consentInfo.put("privacyOptionsRequirementStatus", consentInformation.getPrivacyOptionsRequirementStatus().name());
                     call.resolve(consentInfo);
@@ -223,6 +265,10 @@ public class AdConsentExecutor extends Executor {
                                 if (formError != null) {
                                     call.reject("Error when show consent form", formError.getMessage());
                                 } else {
+                                    // Check (and possibly purge) outdated consent before reading the
+                                    // remaining values, so they reflect the post-cleanup state.
+                                    boolean isConsentOutdated = isConsentOutdated();
+
                                     JSObject consentFormInfo = new JSObject();
                                     consentFormInfo.put("status", getConsentStatusString(consentInformation.getConsentStatus()));
                                     consentFormInfo.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
@@ -231,9 +277,9 @@ public class AdConsentExecutor extends Executor {
                                         "privacyOptionsRequirementStatus",
                                         consentInformation.getPrivacyOptionsRequirementStatus().name()
                                     );
+                                    consentFormInfo.put("isConsentOutdated", isConsentOutdated);
                                     consentFormInfo.put("canShowAds", canShowAds());
                                     consentFormInfo.put("canShowPersonalizedAds", canShowPersonalizedAds());
-                                    consentFormInfo.put("isConsentOutdated", isConsentOutdated());
 
                                     call.resolve(consentFormInfo);
                                 }
