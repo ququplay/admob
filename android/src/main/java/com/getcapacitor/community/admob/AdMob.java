@@ -13,6 +13,7 @@ import com.getcapacitor.community.admob.consent.AdConsentExecutor;
 import com.getcapacitor.community.admob.helpers.AuthorizationStatusEnum;
 import com.getcapacitor.community.admob.interstitial.AdInterstitialExecutor;
 import com.getcapacitor.community.admob.interstitial.InterstitialAdCallbackAndListeners;
+import com.getcapacitor.community.admob.nativead.NativeAdExecutor;
 import com.getcapacitor.community.admob.rewarded.AdRewardExecutor;
 import com.getcapacitor.community.admob.rewardedinterstitial.AdRewardInterstitialExecutor;
 import com.google.android.gms.ads.MobileAds;
@@ -29,6 +30,12 @@ public class AdMob extends Plugin {
     public static final JSArray EMPTY_TESTING_DEVICES = new JSArray();
 
     private final BannerExecutor bannerExecutor = new BannerExecutor(
+        this::getContext,
+        this::getActivity,
+        this::notifyListeners,
+        getLogTag()
+    );
+    private final NativeAdExecutor nativeAdExecutor = new NativeAdExecutor(
         this::getContext,
         this::getActivity,
         this::notifyListeners,
@@ -75,6 +82,7 @@ public class AdMob extends Plugin {
                 }
             );
             bannerExecutor.initialize();
+            nativeAdExecutor.initialize();
             call.resolve();
         } catch (Exception ex) {
             call.reject(ex.getLocalizedMessage(), ex);
@@ -158,6 +166,24 @@ public class AdMob extends Plugin {
     @PluginMethod
     public void removeBanner(final PluginCall call) {
         bannerExecutor.removeBanner(call);
+    }
+
+    // Show a native ad across the top of the screen, loading one when there is none or it expired
+    @PluginMethod
+    public void showNativeAd(final PluginCall call) {
+        nativeAdExecutor.showNativeAd(call);
+    }
+
+    // Hide the native ad but keep it, so showing it again brings back the same ad
+    @PluginMethod
+    public void hideNativeAd(final PluginCall call) {
+        nativeAdExecutor.hideNativeAd(call);
+    }
+
+    // Destroy the native ad, remove it from screen.
+    @PluginMethod
+    public void removeNativeAd(final PluginCall call) {
+        nativeAdExecutor.removeNativeAd(call);
     }
 
     @PluginMethod

@@ -355,6 +355,14 @@ AdMob.addListener(RewardAdPluginEvents.Rewarded, async () => {
 * [`addListener(InterstitialAdPluginEvents.Dismissed, ...)`](#addlistenerinterstitialadplugineventsdismissed-)
 * [`addListener(InterstitialAdPluginEvents.FailedToShow, ...)`](#addlistenerinterstitialadplugineventsfailedtoshow-)
 * [`addListener(InterstitialAdPluginEvents.Showed, ...)`](#addlistenerinterstitialadplugineventsshowed-)
+* [`showNativeAd(...)`](#shownativead)
+* [`hideNativeAd()`](#hidenativead)
+* [`removeNativeAd()`](#removenativead)
+* [`addListener(NativeAdPluginEvents.SizeChanged, ...)`](#addlistenernativeadplugineventssizechanged-)
+* [`addListener(NativeAdPluginEvents.Loaded, ...)`](#addlistenernativeadplugineventsloaded-)
+* [`addListener(NativeAdPluginEvents.FailedToLoad, ...)`](#addlistenernativeadplugineventsfailedtoload-)
+* [`addListener(NativeAdPluginEvents.Clicked, ...)`](#addlistenernativeadplugineventsclicked-)
+* [`addListener(NativeAdPluginEvents.AdImpression, ...)`](#addlistenernativeadplugineventsadimpression-)
 * [`prepareRewardVideoAd(...)`](#preparerewardvideoad)
 * [`showRewardVideoAd()`](#showrewardvideoad)
 * [`addListener(RewardAdPluginEvents.FailedToLoad, ...)`](#addlistenerrewardadplugineventsfailedtoload-)
@@ -807,6 +815,141 @@ addListener(eventName: InterstitialAdPluginEvents.Showed, listenerFunc: () => vo
 --------------------
 
 
+### showNativeAd(...)
+
+```typescript
+showNativeAd(options: NativeAdOptions) => Promise<void>
+```
+
+Show a native ad as a strip across the top of the screen.
+Shows the ad loaded before when there is one and it has not expired, otherwise loads a new one.
+Android and iOS; resolves without showing anything on the web.
+
+| Param         | Type                                                        | Description                                    |
+| ------------- | ----------------------------------------------------------- | ---------------------------------------------- |
+| **`options`** | <code><a href="#nativeadoptions">NativeAdOptions</a></code> | <a href="#nativeadoptions">NativeAdOptions</a> |
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### hideNativeAd()
+
+```typescript
+hideNativeAd() => Promise<void>
+```
+
+Hide the native ad but keep it, so showNativeAd brings back the same ad.
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### removeNativeAd()
+
+```typescript
+removeNativeAd() => Promise<void>
+```
+
+Destroy the native ad, remove it from screen.
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### addListener(NativeAdPluginEvents.SizeChanged, ...)
+
+```typescript
+addListener(eventName: NativeAdPluginEvents.SizeChanged, listenerFunc: (info: AdMobBannerSize) => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                              | Description         |
+| ------------------ | --------------------------------------------------------------------------------- | ------------------- |
+| **`eventName`**    | <code><a href="#nativeadpluginevents">NativeAdPluginEvents.SizeChanged</a></code> | nativeAdSizeChanged |
+| **`listenerFunc`** | <code>(info: <a href="#admobbannersize">AdMobBannerSize</a>) =&gt; void</code>    |                     |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### addListener(NativeAdPluginEvents.Loaded, ...)
+
+```typescript
+addListener(eventName: NativeAdPluginEvents.Loaded, listenerFunc: () => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                         | Description    |
+| ------------------ | ---------------------------------------------------------------------------- | -------------- |
+| **`eventName`**    | <code><a href="#nativeadpluginevents">NativeAdPluginEvents.Loaded</a></code> | nativeAdLoaded |
+| **`listenerFunc`** | <code>() =&gt; void</code>                                                   |                |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### addListener(NativeAdPluginEvents.FailedToLoad, ...)
+
+```typescript
+addListener(eventName: NativeAdPluginEvents.FailedToLoad, listenerFunc: (info: AdMobError) => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                               | Description          |
+| ------------------ | ---------------------------------------------------------------------------------- | -------------------- |
+| **`eventName`**    | <code><a href="#nativeadpluginevents">NativeAdPluginEvents.FailedToLoad</a></code> | nativeAdFailedToLoad |
+| **`listenerFunc`** | <code>(info: <a href="#admoberror">AdMobError</a>) =&gt; void</code>               |                      |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### addListener(NativeAdPluginEvents.Clicked, ...)
+
+```typescript
+addListener(eventName: NativeAdPluginEvents.Clicked, listenerFunc: () => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                          | Description     |
+| ------------------ | ----------------------------------------------------------------------------- | --------------- |
+| **`eventName`**    | <code><a href="#nativeadpluginevents">NativeAdPluginEvents.Clicked</a></code> | nativeAdClicked |
+| **`listenerFunc`** | <code>() =&gt; void</code>                                                    |                 |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
+### addListener(NativeAdPluginEvents.AdImpression, ...)
+
+```typescript
+addListener(eventName: NativeAdPluginEvents.AdImpression, listenerFunc: () => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                               | Description        |
+| ------------------ | ---------------------------------------------------------------------------------- | ------------------ |
+| **`eventName`**    | <code><a href="#nativeadpluginevents">NativeAdPluginEvents.AdImpression</a></code> | nativeAdImpression |
+| **`listenerFunc`** | <code>() =&gt; void</code>                                                         |                    |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
 ### prepareRewardVideoAd(...)
 
 ```typescript
@@ -1182,6 +1325,30 @@ https://developers.google.com/android/reference/com/google/android/gms/ads/AdErr
 | **`immersiveMode`** | <code>boolean</code> | Sets a flag that controls if this interstitial or reward object will be displayed in immersive mode. Call this method before show. During show, if this flag is on and immersive mode is supported, SYSTEM_UI_FLAG_IMMERSIVE_STICKY &SYSTEM_UI_FLAG_HIDE_NAVIGATION will be turned on for interstitial or reward ad. |                    | 7.0.3 |
 
 
+#### NativeAdOptions
+
+| Prop                | Type                                                    | Description                                                                                                                                                                                                                                                                                                          | Default            | Since |
+| ------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----- |
+| **`style`**         | <code><a href="#nativeadstyle">NativeAdStyle</a></code> | Colours of the native ad strip, as `#RRGGBB` (or `#AARRGGBB`).                                                                                                                                                                                                                                                       |                    | 8.1.0 |
+| **`adId`**          | <code>string</code>                                     | The ad unit ID that you want to request                                                                                                                                                                                                                                                                              |                    | 1.1.2 |
+| **`isTesting`**     | <code>boolean</code>                                    | You can use test mode of ad.                                                                                                                                                                                                                                                                                         | <code>false</code> | 1.1.2 |
+| **`margin`**        | <code>number</code>                                     | Margin Banner. Default is 0px; If position is BOTTOM_CENTER, margin is be margin-bottom. If position is TOP_CENTER, margin is be margin-top.                                                                                                                                                                         | <code>0</code>     | 1.1.2 |
+| **`npa`**           | <code>boolean</code>                                    | The default behavior of the Google Mobile Ads SDK is to serve personalized ads. Set this to true to request Non-Personalized Ads                                                                                                                                                                                     | <code>false</code> | 1.2.0 |
+| **`immersiveMode`** | <code>boolean</code>                                    | Sets a flag that controls if this interstitial or reward object will be displayed in immersive mode. Call this method before show. During show, if this flag is on and immersive mode is supported, SYSTEM_UI_FLAG_IMMERSIVE_STICKY &SYSTEM_UI_FLAG_HIDE_NAVIGATION will be turned on for interstitial or reward ad. |                    | 7.0.3 |
+
+
+#### NativeAdStyle
+
+| Prop                     | Type                | Description                                                   |
+| ------------------------ | ------------------- | ------------------------------------------------------------- |
+| **`backgroundColor`**    | <code>string</code> | Background of the strip. Defaults to white.                   |
+| **`textColor`**          | <code>string</code> | Headline text. Defaults to black.                             |
+| **`secondaryTextColor`** | <code>string</code> | Body text. Defaults to textColor.                             |
+| **`buttonColor`**        | <code>string</code> | Call-to-action button and "Ad" badge background.              |
+| **`buttonTextColor`**    | <code>string</code> | Call-to-action button and "Ad" badge text. Defaults to white. |
+| **`dividerColor`**       | <code>string</code> | Hairline along the bottom of the strip. Defaults to none.     |
+
+
 #### RewardAdOptions
 
 | Prop                | Type                                                                                                                                                                                                                                               | Description                                                                                                                                                                                                                                                                                                          | Default            | Since |
@@ -1329,6 +1496,17 @@ From T, pick a set of properties whose keys are in the union K
 | **`Showed`**       | <code>'interstitialAdShowed'</code>       | Emits when the Interstitial ad is visible to the user                                  |
 | **`FailedToShow`** | <code>'interstitialAdFailedToShow'</code> | Emits when the Interstitial ad is failed to show                                       |
 | **`Dismissed`**    | <code>'interstitialAdDismissed'</code>    | Emits when the Interstitial ad is not visible to the user anymore.                     |
+
+
+#### NativeAdPluginEvents
+
+| Members            | Value                               | Description                                             |
+| ------------------ | ----------------------------------- | ------------------------------------------------------- |
+| **`SizeChanged`**  | <code>'nativeAdSizeChanged'</code>  | The strip's size in dp; 0 when it is hidden or removed. |
+| **`Loaded`**       | <code>'nativeAdLoaded'</code>       |                                                         |
+| **`FailedToLoad`** | <code>'nativeAdFailedToLoad'</code> |                                                         |
+| **`Clicked`**      | <code>'nativeAdClicked'</code>      |                                                         |
+| **`AdImpression`** | <code>'nativeAdImpression'</code>   |                                                         |
 
 
 #### RewardAdPluginEvents
