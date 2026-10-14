@@ -21,7 +21,7 @@
             android:paddingStart="12dp"
             android:paddingTop="6dp"
             android:paddingEnd="20dp"
-            android:paddingBottom="9dp">
+            android:paddingBottom="7dp">
 
             <ImageView
                 android:id="@+id/admob_native_ad_icon"

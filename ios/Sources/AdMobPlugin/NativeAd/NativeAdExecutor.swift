@@ -175,7 +175,7 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
             content.topAnchor.constraint(equalTo: adView.topAnchor, constant: 6),
             content.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 12),
             content.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -20),
-            content.bottomAnchor.constraint(equalTo: divider.topAnchor, constant: -9),
+            content.bottomAnchor.constraint(equalTo: divider.topAnchor, constant: -7),
             content.heightAnchor.constraint(greaterThanOrEqualToConstant: 41),
 
             iconView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
