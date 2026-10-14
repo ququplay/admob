@@ -37,6 +37,7 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
     var testingDevices: [String] = []
 
     private let bannerExecutor = BannerExecutor()
+    private let nativeAdExecutor = NativeAdExecutor()
     private let adInterstitialExecutor = AdInterstitialExecutor()
     private let adRewardExecutor = AdRewardExecutor()
     private let adRewardInterstitialExecutor = AdRewardInterstitialExecutor()
@@ -48,6 +49,7 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     @objc func initialize(_ call: CAPPluginCall) {
         self.bannerExecutor.plugin = self
+        self.nativeAdExecutor.plugin = self
         self.adInterstitialExecutor.plugin = self
         self.adRewardExecutor.plugin = self
         self.adRewardInterstitialExecutor.plugin = self
@@ -132,18 +134,28 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /**
-     *  Native ads are Android only for now; these resolve without showing anything.
+     *  AdMob: Native ad strip across the top of the screen
+     *  https://developers.google.com/admob/ios/native
      */
     @objc func showNativeAd(_ call: CAPPluginCall) {
-        call.resolve([:])
+        let adUnitID = getAdId(call, "ca-app-pub-3940256099942544/3986624511")
+        let request = self.GADRequestWithOption(call.getBool("npa") ?? false)
+
+        DispatchQueue.main.async {
+            self.nativeAdExecutor.showNativeAd(call, request, adUnitID)
+        }
     }
 
     @objc func hideNativeAd(_ call: CAPPluginCall) {
-        call.resolve([:])
+        DispatchQueue.main.async {
+            self.nativeAdExecutor.hideNativeAd(call)
+        }
     }
 
     @objc func removeNativeAd(_ call: CAPPluginCall) {
-        call.resolve([:])
+        DispatchQueue.main.async {
+            self.nativeAdExecutor.removeNativeAd(call)
+        }
     }
 
     /**

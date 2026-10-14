@@ -823,7 +823,7 @@ showNativeAd(options: NativeAdOptions) => Promise<void>
 
 Show a native ad as a strip across the top of the screen.
 Shows the ad loaded before when there is one and it has not expired, otherwise loads a new one.
-Android only; resolves without showing anything on iOS and the web.
+Android and iOS; resolves without showing anything on the web.
 
 | Param         | Type                                                        | Description                                    |
 | ------------- | ----------------------------------------------------------- | ---------------------------------------------- |
