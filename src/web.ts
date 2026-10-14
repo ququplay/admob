@@ -9,6 +9,7 @@ import type {
 } from '.';
 import { AdmobConsentStatus } from './consent/consent-status.enum';
 import { PrivacyOptionsRequirementStatus } from './consent/privacy-options-requirement-status.enum';
+import type { NativeAdOptions } from './native-ad';
 import type { AdMobRewardItem } from './reward';
 import type { AdOptions, AdLoadInfo } from './shared';
 import type { TrackingAuthorizationStatusInterface } from './shared/tracking-authorization-status.interface';
@@ -80,6 +81,18 @@ export class AdMobWeb extends WebPlugin implements AdMobPlugin {
   // Destroy the banner, remove it from screen.
   async removeBanner(): Promise<void> {
     console.log('removeBanner');
+  }
+
+  async showNativeAd(options: NativeAdOptions): Promise<void> {
+    console.log('showNativeAd', options);
+  }
+
+  async hideNativeAd(): Promise<void> {
+    console.log('hideNativeAd');
+  }
+
+  async removeNativeAd(): Promise<void> {
+    console.log('removeNativeAd');
   }
 
   async prepareInterstitial(options: AdOptions): Promise<AdLoadInfo> {

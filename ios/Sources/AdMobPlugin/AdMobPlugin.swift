@@ -23,6 +23,9 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "resumeBanner", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hideBanner", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "removeBanner", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "showNativeAd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hideNativeAd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "removeNativeAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareInterstitial", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showInterstitial", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareRewardVideoAd", returnType: CAPPluginReturnPromise),
@@ -126,6 +129,21 @@ public class AdMobPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.bannerExecutor.removeBanner(call)
         }
+    }
+
+    /**
+     *  Native ads are Android only for now; these resolve without showing anything.
+     */
+    @objc func showNativeAd(_ call: CAPPluginCall) {
+        call.resolve([:])
+    }
+
+    @objc func hideNativeAd(_ call: CAPPluginCall) {
+        call.resolve([:])
+    }
+
+    @objc func removeNativeAd(_ call: CAPPluginCall) {
+        call.resolve([:])
     }
 
     /**
