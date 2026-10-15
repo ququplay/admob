@@ -5,6 +5,8 @@ import GoogleMobileAds
 /**
  * A native ad drawn as a strip across the top of the screen, below the status bar, over the WebView like a top banner.
  * Hiding keeps the loaded ad, so showing it again brings back the same ad without a new request.
+ * With a refresh interval, a new ad replaces it once it has been on screen that long in all, hidden time and time in
+ * the background not counted; the old one stays up until the new one comes.
  */
 class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
     weak var plugin: AdMobPlugin?
@@ -18,6 +20,16 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
     private var loadedAdUnitID: String?
     private var loadedAt = Date.distantPast
     private var wantsVisible = false
+    private var inBackground = false
+    // What the next refresh asks for: the last show's ad unit and request.
+    private var adUnitID: String?
+    private var request: Request?
+    private var refreshInterval: TimeInterval = 0
+    // How long the current ad has been on screen: the time before it was last hidden, and since when it shows.
+    private var shownTime: TimeInterval = 0
+    private var shownSince: Date?
+    private var refreshTimer: Timer?
+    private var observers: [NSObjectProtocol] = []
 
     private let iconView = UIImageView()
     private let badgeLabel = PaddedLabel()
@@ -35,10 +47,15 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
 
         ensureAdView(in: rootViewController.view)
         applyStyle(call.getObject("style") ?? [:])
+        observeApp()
         wantsVisible = true
+        self.adUnitID = adUnitID
+        self.request = request
+        refreshInterval = TimeInterval(max(0, call.getInt("refreshInterval") ?? 0))
 
         if nativeAd != nil && loadedAdUnitID == adUnitID && !isExpired() {
             setVisible(true)
+            startCounting()
         } else {
             load(adUnitID, request, rootViewController)
         }
@@ -48,6 +65,7 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
 
     func hideNativeAd(_ call: CAPPluginCall) {
         wantsVisible = false
+        stopCounting()
         if adView != nil {
             setVisible(false)
         }
@@ -56,6 +74,7 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
 
     func removeNativeAd(_ call: CAPPluginCall) {
         wantsVisible = false
+        stopCounting()
         nativeAd = nil
         loadedAdUnitID = nil
 
@@ -87,23 +106,28 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
         // Removed while it loaded.
         guard let adView = adView else { return }
 
+        stopCounting()
         nativeAd.delegate = self
         self.nativeAd = nativeAd
         loadedAdUnitID = adLoader.adUnitID
         loadedAt = Date()
+        shownTime = 0
         populate(adView, nativeAd)
         plugin?.notifyListeners(NativeAdPluginEvents.Loaded.rawValue, data: [:])
 
         if wantsVisible {
             setVisible(true)
+            startCounting()
         }
     }
 
     func adLoader(_ adLoader: AdLoader, didFailToReceiveAdWithError error: Error) {
         self.adLoader = nil
         NSLog("AdMob: native ad failed to load: \(error.localizedDescription)")
+        stopCounting()
 
-        // An expired ad may not be shown again; a fresh one keeps showing.
+        // An expired ad may not be shown again; a fresh one keeps showing, and the next refresh is tried after another
+        // interval on screen.
         if nativeAd != nil && isExpired() {
             nativeAd = nil
             loadedAdUnitID = nil
@@ -111,6 +135,8 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
         if nativeAd == nil && adView != nil {
             setVisible(false)
         }
+        shownTime = 0
+        startCounting()
 
         plugin?.notifyListeners(NativeAdPluginEvents.FailedToLoad.rawValue, data: [
             "code": (error as NSError).code,
@@ -124,6 +150,45 @@ class NativeAdExecutor: NSObject, NativeAdLoaderDelegate, NativeAdDelegate {
 
     func nativeAdDidRecordImpression(_ nativeAd: NativeAd) {
         plugin?.notifyListeners(NativeAdPluginEvents.AdImpression.rawValue, data: [:])
+    }
+
+    // Counts the time the ad is on screen and asks for a new one when it has been there for the refresh interval.
+    private func startCounting() {
+        if shownSince != nil || refreshInterval <= 0 || nativeAd == nil || !wantsVisible || inBackground { return }
+
+        shownSince = Date()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: max(0, refreshInterval - shownTime), repeats: false) { [weak self] _ in
+            guard let self = self, let adUnitID = self.adUnitID, let request = self.request,
+                  let rootViewController = self.plugin?.getRootVC() else { return }
+
+            self.load(adUnitID, request, rootViewController)
+        }
+    }
+
+    private func stopCounting() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        guard let shownSince = shownSince else { return }
+
+        shownTime += Date().timeIntervalSince(shownSince)
+        self.shownSince = nil
+    }
+
+    // The app went to the background, or came back: the ad is not on screen meanwhile.
+    private func observeApp() {
+        if !observers.isEmpty { return }
+
+        let center = NotificationCenter.default
+        observers = [
+            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.inBackground = true
+                self?.stopCounting()
+            },
+            center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.inBackground = false
+                self?.startCounting()
+            }
+        ]
     }
 
     // Icon, "Ad" badge, headline and body, the call to action and AdChoices in the top right corner; a hairline along

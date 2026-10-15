@@ -7,6 +7,15 @@ export interface NativeAdOptions extends AdOptions {
    * @since 8.1.0
    */
   style?: NativeAdStyle;
+
+  /**
+   * Seconds the ad stays on screen before a new one replaces it. Only the time it is shown counts: hidden, or with
+   * the app in the background, it waits. The old ad stays up until the new one loads. 0, the default, keeps it until
+   * it expires after an hour.
+   *
+   * @since 8.2.0
+   */
+  refreshInterval?: number;
 }
 
 export interface NativeAdStyle {

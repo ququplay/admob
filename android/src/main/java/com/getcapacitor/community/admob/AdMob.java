@@ -168,6 +168,18 @@ public class AdMob extends Plugin {
         bannerExecutor.removeBanner(call);
     }
 
+    @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        nativeAdExecutor.onPause();
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        nativeAdExecutor.onResume();
+    }
+
     // Show a native ad across the top of the screen, loading one when there is none or it expired
     @PluginMethod
     public void showNativeAd(final PluginCall call) {
