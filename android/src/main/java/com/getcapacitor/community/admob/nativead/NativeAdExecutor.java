@@ -39,6 +39,8 @@ import com.google.android.gms.common.util.BiConsumer;
 /**
  * A native ad drawn as a strip across the top of the screen, over the WebView, like a top banner.
  * Hiding keeps the loaded ad, so showing it again brings back the same ad without a new request.
+ * With a refresh interval, a new ad replaces it once it has been on screen that long in all, hidden time and time in
+ * the background not counted; the old one stays up until the new one comes.
  */
 public class NativeAdExecutor extends Executor {
 
@@ -55,6 +57,17 @@ public class NativeAdExecutor extends Executor {
     private long mLoadedAt;
     private boolean mLoading;
     private boolean mWantsVisible;
+    private boolean mPaused;
+    // What the next refresh asks for: the last show's ad unit and request.
+    private String mAdId;
+    private AdRequest mAdRequest;
+    private long mRefreshMs;
+    // How long the current ad has been on screen: the time before it was last hidden, and since when it shows.
+    private long mShownMs;
+    private long mShownSince = -1;
+    private final Runnable mRefresh = () -> {
+        if (mAdId != null) load(mAdId, mAdRequest);
+    };
     // The status bar can change height while the ad is up (rotation, display size), so its margin follows it.
     private final ViewTreeObserver.OnGlobalLayoutListener insetListener = () -> {
         if (mAdView != null) applyTopInset();
@@ -76,6 +89,7 @@ public class NativeAdExecutor extends Executor {
     public void showNativeAd(final PluginCall call) {
         final AdOptions adOptions = AdOptions.getFactory().createGenericOptions(call, NATIVE_TESTER_ID);
         final JSObject style = call.getObject("style", new JSObject());
+        final long refreshMs = Math.max(0, call.getInt("refreshInterval", 0)) * 1000L;
 
         activitySupplier
             .get()
@@ -89,8 +103,13 @@ public class NativeAdExecutor extends Executor {
                     final AdRequest adRequest = RequestHelper.createRequest(adOptions);
                     final String adId = AdViewIdHelper.getFinalAdId(adOptions, adRequest, logTag, contextSupplier.get());
 
+                    mAdId = adId;
+                    mAdRequest = adRequest;
+                    mRefreshMs = refreshMs;
+
                     if (mNativeAd != null && adId.equals(mLoadedAdId) && !isExpired()) {
                         setVisible(true);
+                        startCounting();
                     } else {
                         load(adId, adRequest);
                     }
@@ -107,6 +126,7 @@ public class NativeAdExecutor extends Executor {
             .get()
             .runOnUiThread(() -> {
                 mWantsVisible = false;
+                stopCounting();
                 if (mAdView != null) {
                     setVisible(false);
                 }
@@ -119,6 +139,7 @@ public class NativeAdExecutor extends Executor {
             .get()
             .runOnUiThread(() -> {
                 mWantsVisible = false;
+                stopCounting();
                 destroyNativeAd();
 
                 if (mAdView != null) {
@@ -151,15 +172,18 @@ public class NativeAdExecutor extends Executor {
                     return;
                 }
 
+                stopCounting();
                 destroyNativeAd();
                 mNativeAd = nativeAd;
                 mLoadedAdId = adId;
                 mLoadedAt = SystemClock.elapsedRealtime();
+                mShownMs = 0;
                 populate(nativeAd);
                 notifyListeners(NativeAdPluginEvents.Loaded.getWebEventName(), emptyObject);
 
                 if (mWantsVisible) {
                     setVisible(true);
+                    startCounting();
                 }
             })
             .withAdListener(
@@ -167,14 +191,18 @@ public class NativeAdExecutor extends Executor {
                     @Override
                     public void onAdFailedToLoad(@NonNull LoadAdError adError) {
                         mLoading = false;
+                        stopCounting();
 
-                        // An expired ad may not be shown again; a fresh one keeps showing.
+                        // An expired ad may not be shown again; a fresh one keeps showing, and the next refresh is
+                        // tried after another interval on screen.
                         if (mNativeAd != null && isExpired()) {
                             destroyNativeAd();
                         }
                         if (mNativeAd == null && mAdView != null) {
                             setVisible(false);
                         }
+                        mShownMs = 0;
+                        startCounting();
 
                         notifyListeners(NativeAdPluginEvents.FailedToLoad.getWebEventName(), new AdMobPluginError(adError));
                     }
@@ -193,6 +221,33 @@ public class NativeAdExecutor extends Executor {
             .build();
 
         adLoader.loadAd(adRequest);
+    }
+
+    // The app went to the background, or came back: the ad is not on screen meanwhile.
+    public void onPause() {
+        mPaused = true;
+        stopCounting();
+    }
+
+    public void onResume() {
+        mPaused = false;
+        startCounting();
+    }
+
+    // Counts the time the ad is on screen and asks for a new one when it has been there for the refresh interval.
+    private void startCounting() {
+        if (mShownSince >= 0 || mRefreshMs <= 0 || mNativeAd == null || mAdView == null || !mWantsVisible || mPaused) return;
+
+        mShownSince = SystemClock.elapsedRealtime();
+        mAdView.postDelayed(mRefresh, Math.max(0, mRefreshMs - mShownMs));
+    }
+
+    private void stopCounting() {
+        if (mAdView != null) mAdView.removeCallbacks(mRefresh);
+        if (mShownSince < 0) return;
+
+        mShownMs += SystemClock.elapsedRealtime() - mShownSince;
+        mShownSince = -1;
     }
 
     private void ensureAdView() {
